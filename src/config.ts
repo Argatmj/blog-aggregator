@@ -37,7 +37,6 @@ export function setUser(name: string){
         currentUserName: name
     };
     writeConfig(config);
-    console.log(config)
 
 }
 
