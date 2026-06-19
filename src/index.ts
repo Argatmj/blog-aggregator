@@ -1,26 +1,34 @@
-import { commandRegistry, handlerLogin, runCommand } from "./command.js";
-import { setUser, readConfig } from "./config.js";
-
-function main() {
+import { commandRegistry, handlerLogin, runCommand, registerCommand, handlerRegister, handlerReset, handlerUsers, handlerAgg, handlerFeed, handlerFeeds, handlerFollowing, handlerFollow, middlewareLoggedIn, handlerUnfollow} from "./command.js";
+async function main() {
+   
     const cmdRegistry: commandRegistry ={
         "login": handlerLogin
     } 
-    const [cmdName, ...args] = process.argv.slice(2);
 
-    console.log(cmdName);
-    console.log(args);
+    registerCommand(cmdRegistry, "register", handlerRegister);
+    registerCommand(cmdRegistry, "reset", handlerReset);
+    registerCommand(cmdRegistry, "users", handlerUsers);
+    registerCommand(cmdRegistry, "agg", handlerAgg);
+    registerCommand(cmdRegistry, "feeds", handlerFeeds);
+    registerCommand(cmdRegistry, "addfeed", middlewareLoggedIn(handlerFeed));
+    registerCommand(cmdRegistry, "follow", middlewareLoggedIn(handlerFollow));
+    registerCommand(cmdRegistry, "following", middlewareLoggedIn(handlerFollowing));
+    registerCommand(cmdRegistry, "unfollow", middlewareLoggedIn(handlerUnfollow));
+
+
+    const [cmdName, ...args] = process.argv.slice(2);
+    const singleCmd = ["reset","users","agg","feeds","following"];
     
-    if (cmdName === undefined){
+    if (cmdName === undefined && !(singleCmd.includes(cmdName))){
         console.log("Not enough arguments were provided.")
         process.exit(0)
     }
     
-    if (args.length === 0){
+    if (args.length === 0 && !(singleCmd.includes(cmdName))){
         console.log("Username is required.")
         process.exit(0)
     } 
-    runCommand(cmdRegistry, cmdName, ...args);
-    console.log(readConfig());
+    await runCommand(cmdRegistry, cmdName, ...args);
 }
 
 main();

@@ -16,7 +16,7 @@ function validateConfig(rawConfig: any): Config {
     if (
         typeof rawConfig === "object" &&
         rawConfig !== null &&
-        typeof rawConfig.db_url === "string" &&
+        typeof rawConfig.dbUrl === "string" &&
         typeof rawConfig.currentUserName === "string"
     ) {
     return rawConfig;

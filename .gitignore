@@ -1,1 +1,3 @@
 node_modules/
+src/lib/db/meta/
+src/lib/db/*.sql
