@@ -1,4 +1,4 @@
-import { commandRegistry, handlerLogin, runCommand, registerCommand, handlerRegister, handlerReset, handlerUsers, handlerAgg, handlerFeed, handlerFeeds, handlerFollowing, handlerFollow, middlewareLoggedIn, handlerUnfollow} from "./command.js";
+import { commandRegistry, handlerLogin, runCommand, registerCommand, handlerRegister, handlerReset, handlerUsers, handlerAgg, handlerFeed, handlerFeeds, handlerFollowing, handlerFollow, middlewareLoggedIn, handlerUnfollow, handlerBrowse} from "./command.js";
 async function main() {
    
     const cmdRegistry: commandRegistry ={
@@ -14,10 +14,10 @@ async function main() {
     registerCommand(cmdRegistry, "follow", middlewareLoggedIn(handlerFollow));
     registerCommand(cmdRegistry, "following", middlewareLoggedIn(handlerFollowing));
     registerCommand(cmdRegistry, "unfollow", middlewareLoggedIn(handlerUnfollow));
-
+     registerCommand(cmdRegistry, "browse", middlewareLoggedIn(handlerBrowse));
 
     const [cmdName, ...args] = process.argv.slice(2);
-    const singleCmd = ["reset","users","agg","feeds","following"];
+    const singleCmd = ["reset","users","agg","feeds","following", "browse"];
     
     if (cmdName === undefined && !(singleCmd.includes(cmdName))){
         console.log("Not enough arguments were provided.")

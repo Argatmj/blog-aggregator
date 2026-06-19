@@ -1,5 +1,5 @@
 import { setUser, readConfig } from "./config.js";
-import { createUser, findUser, deleteUsers, getUsers, createFeed, deleteFeeds, getFeeds, findUserById, createFeedFollow, getFeedFollowsForUser, findFeedByUrl, deleteFollows, deleteFollowing } from "./lib/db/queries.js";
+import { createUser, findUser, deleteUsers, getUsers, createFeed, deleteFeeds, getFeeds, findUserById, createFeedFollow, getFeedFollowsForUser, findFeedByUrl, deleteFollows, deleteFollowing, getNextFeedFetch, markFeedFetch, createPost, getPostsForUsers, deletePosts } from "./lib/db/queries.js";
 import { fetchFeed } from "./rss.js";
 import { feeds, users } from "./schema.js";
 
@@ -15,6 +15,14 @@ export type commandRegistry = Record<string, commandHandle>;
 
 export type Feed = typeof feeds.$inferSelect;
 export type User = typeof users.$inferSelect;
+
+const handleError = (err: unknown) => {
+        if (err instanceof Error){
+            console.log(err.message);
+        }else {
+            console.log("Encountered Error.");
+        }
+}
 
 export function registerCommand(registry: commandRegistry, cmdName: string, handler: commandHandle){
     registry[cmdName] = handler;
@@ -80,8 +88,9 @@ export async function handlerReset(cmdName: string, ...args: string[]): Promise<
     const res = await deleteUsers();
     const fes = await deleteFeeds();
     const fos = await deleteFollows();
-    if (res === undefined && fes == undefined && fos == undefined){
-        console.log("Table users, feeds, and follows has been successfully reset!")
+    const pos = await deletePosts();
+    if (res === undefined && fes == undefined && fos == undefined && pos == undefined){
+        console.log("Table users, feeds, posts, and follows has been successfully reset!")
     }
     process.exit(0);
 }
@@ -100,10 +109,35 @@ export async function handlerUsers(cmdName: string, ...args: string[]): Promise<
 }
 
 export async function handlerAgg(cmdName: string, ...args: string[]): Promise<void> {
-    const feed = await fetchFeed("https://www.wagslane.dev/index.xml");
-    console.log(feed);
-    console.log(feed.channel.item[0]);
-    process.exit(0);
+    const durationStr = args[0];
+    const regex = /^(\d+)(ms|s|m|h)$/;
+    const match = durationStr.match(regex);
+    
+    if (!match) {
+        throw new Error("Invalid duration format. Use: 500ms, 30s, 5m, or 2h");
+    }
+
+    const num = parseInt(match[1]);
+    const unitToMs = {ms: 1, s: 1000, m: 60000, h: 3600000};
+    const unit = match[2]
+    const delay = num * unitToMs[unit as keyof typeof unitToMs];
+
+    console.log(`Collecting feeds every ${durationStr}`);
+    scrapeFeeds().catch(handleError)
+
+    const interval = setInterval(() => {
+        scrapeFeeds().catch(handleError);
+    }, delay);
+
+    await new Promise<void>((resolve) => {
+        process.on("SIGINT", () => {
+            console.log("Shutting down feed aggregator...");
+            clearInterval(interval);
+            resolve();
+            process.exit(0);
+    });
+
+});
 }
 
 export async function handlerFeed(cmdName: string, user: User, ...args: string[]): Promise<void> {
@@ -166,4 +200,41 @@ export async function handlerUnfollow(cmdName: string, user: User, ...args: stri
     const res = await deleteFollowing(user.id,feed.id);
     console.log("Feed successfully unfollowed!");
     process.exit(0);
+}
+
+async function scrapeFeeds(){
+    const currentFeed = await getNextFeedFetch();
+    const feedObj = await fetchFeed(currentFeed.url);
+    const res = await markFeedFetch(currentFeed.id);
+    const items = feedObj.channel.item;
+
+    for (const idx in items){
+        const currPost = items[idx];
+        const res = await createPost(currPost.title, currPost.description, currPost.link, currentFeed.id, currPost.pubDate);
+    }
+    console.log(`${currentFeed.url} successfully scraped!`);
+}
+
+export async function handlerBrowse(cmdName: string, user: User, ...args: string[]): Promise<void> {
+    const lim: number = parseInt(args[0]);
+    const posts = await getPostsForUsers(user.id, lim);
+    if (posts.length === 0) {
+        console.log("No posts to browse from your followed feeds!");
+        process.exit(0);
+    }
+
+    console.log(`\nPosts from your followed feeds:\n`);
+
+    for (const idx in posts) {
+        const currPost = posts[idx].post;
+        console.log(`Title: ${currPost.title}`);
+        console.log(`URL: ${currPost.url}`);
+        console.log(`Description: ${currPost.description}`);
+        console.log(`Published: ${currPost.publishedAt}`);
+        console.log("" + "─".repeat(60));
+    }
+
+    console.log(`\nTotal: ${posts.length} post(s)`);
+    process.exit(0);
+
 }
